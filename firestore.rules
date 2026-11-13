@@ -1,0 +1,540 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection health check document
+    match /test/connection {
+      allow get: if isSignedIn();
+    }
+
+    // --- Reusable Security & Identity Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedOwner() {
+      return isSignedIn() && request.auth.token.email == 'markazalfurqan36@gmail.com';
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActiveAccount() {
+      return isBootstrappedOwner() || (isSignedIn() && userDocExists() && userDoc().status == 'active');
+    }
+
+    function isOwner() {
+      return isBootstrappedOwner() || (isActiveAccount() && userDoc().role == 'owner');
+    }
+
+    function isAdminOrOwner() {
+      return isOwner() || (isActiveAccount() && userDoc().role == 'admin');
+    }
+
+    function isCashierOrAbove() {
+      return isAdminOrOwner() || (isActiveAccount() && userDoc().role == 'cashier');
+    }
+
+    function isViewerOrAbove() {
+      return isCashierOrAbove() || (isActiveAccount() && userDoc().role == 'viewer');
+    }
+
+    function isValidOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isValidOptionalId(data, field) {
+      return !(field in data) || (data[field] is string && data[field].size() >= 1 && data[field].size() <= 128 && data[field].matches('^[a-zA-Z0-9_\\-]+$'));
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserAccount(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'status', 'linkedMemberId', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && isValidOptionalString(data, 'photoURL', 500)
+        && data.role in ['owner', 'admin', 'cashier', 'viewer', 'member']
+        && data.status in ['active', 'suspended']
+        && isValidOptionalId(data, 'linkedMemberId')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMember(data) {
+      return data.keys().hasAll(['memberCode', 'fullName', 'category', 'monthlyCommitment', 'status', 'joinedDate', 'effectiveMonth', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['memberCode', 'fullName', 'phone', 'email', 'location', 'birthDate', 'category', 'monthlyCommitment', 'status', 'joinedDate', 'effectiveMonth', 'notes', 'linkedUid', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.memberCode is string && data.memberCode.size() >= 2 && data.memberCode.size() <= 32 && data.memberCode.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120
+        && isValidOptionalString(data, 'phone', 32)
+        && isValidOptionalString(data, 'email', 200)
+        && isValidOptionalString(data, 'location', 160)
+        && isValidOptionalString(data, 'birthDate', 32)
+        && data.category in ['monthly', 'sponsor', 'lifetime', 'donor']
+        && (data.monthlyCommitment is int || data.monthlyCommitment is float) && data.monthlyCommitment > 0
+        && data.status in ['active', 'paused', 'ended']
+        && data.joinedDate is string && data.joinedDate.size() >= 4 && data.joinedDate.size() <= 32
+        && data.effectiveMonth is string && data.effectiveMonth.size() >= 7 && data.effectiveMonth.size() <= 20
+        && isValidOptionalString(data, 'notes', 500)
+        && isValidOptionalId(data, 'linkedUid')
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCommitmentHistory(data, memberId) {
+      return data.keys().hasAll(['memberId', 'amountEtb', 'effectiveFrom', 'reason', 'changedBy', 'changedByName', 'createdAt'])
+        && data.keys().hasOnly(['memberId', 'amountEtb', 'effectiveFrom', 'reason', 'changedBy', 'changedByName', 'createdAt'])
+        && data.memberId is string && data.memberId == memberId && isValidId(data.memberId)
+        && (data.amountEtb is int || data.amountEtb is float) && data.amountEtb > 0
+        && data.effectiveFrom is string && data.effectiveFrom.size() >= 7 && data.effectiveFrom.size() <= 20
+        && data.reason is string && data.reason.size() >= 2 && data.reason.size() <= 300
+        && data.changedBy is string && isValidId(data.changedBy) && data.changedBy == request.auth.uid
+        && data.changedByName is string && data.changedByName.size() >= 1 && data.changedByName.size() <= 120
+        && data.createdAt is timestamp;
+    }
+
+    function isValidStatusHistory(data, memberId) {
+      return data.keys().hasAll(['memberId', 'status', 'effectiveFrom', 'reason', 'changedBy', 'changedByName', 'createdAt'])
+        && data.keys().hasOnly(['memberId', 'status', 'effectiveFrom', 'reason', 'changedBy', 'changedByName', 'createdAt'])
+        && data.memberId is string && data.memberId == memberId && isValidId(data.memberId)
+        && data.status in ['active', 'paused', 'ended']
+        && data.effectiveFrom is string && data.effectiveFrom.size() >= 7 && data.effectiveFrom.size() <= 20
+        && data.reason is string && data.reason.size() >= 2 && data.reason.size() <= 300
+        && data.changedBy is string && isValidId(data.changedBy) && data.changedBy == request.auth.uid
+        && data.changedByName is string && data.changedByName.size() >= 1 && data.changedByName.size() <= 120
+        && data.createdAt is timestamp;
+    }
+
+    function isValidContribution(data) {
+      return data.keys().hasAll(['receiptNumber', 'memberId', 'memberName', 'memberCode', 'amount', 'currency', 'month', 'paymentDate', 'paymentMethod', 'status', 'recordedBy', 'recordedByName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['receiptNumber', 'memberId', 'memberName', 'memberCode', 'linkedUid', 'amount', 'currency', 'month', 'paymentDate', 'paymentMethod', 'referenceCode', 'status', 'statusReason', 'statusChangedBy', 'evidenceNote', 'notes', 'recordedBy', 'recordedByName', 'createdAt', 'updatedAt'])
+        && data.receiptNumber is string && data.receiptNumber.size() >= 3 && data.receiptNumber.size() <= 40 && data.receiptNumber.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.memberId is string && isValidId(data.memberId)
+        && data.memberName is string && data.memberName.size() >= 2 && data.memberName.size() <= 120
+        && data.memberCode is string && data.memberCode.size() >= 2 && data.memberCode.size() <= 32
+        && isValidOptionalId(data, 'linkedUid')
+        && (data.amount is int || data.amount is float) && data.amount > 0
+        && data.currency == 'ETB'
+        && data.month is string && data.month.size() >= 7 && data.month.size() <= 20
+        && data.paymentDate is string && data.paymentDate.size() >= 4 && data.paymentDate.size() <= 32
+        && data.paymentMethod in ['cash', 'cbe', 'telebirr', 'coop_bank', 'awash_bank', 'other']
+        && isValidOptionalString(data, 'referenceCode', 80)
+        && data.status in ['pending', 'confirmed', 'cancelled', 'rejected']
+        && isValidOptionalString(data, 'statusReason', 300)
+        && isValidOptionalString(data, 'statusChangedBy', 120)
+        && isValidOptionalString(data, 'evidenceNote', 200)
+        && isValidOptionalString(data, 'notes', 500)
+        && data.recordedBy is string && isValidId(data.recordedBy)
+        && data.recordedByName is string && data.recordedByName.size() >= 1 && data.recordedByName.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPaymentEvidence(data) {
+      return data.keys().hasAll(['contributionId', 'memberId', 'fileName', 'mimeType', 'storageReference', 'uploadedBy', 'uploadedByName', 'createdAt'])
+        && data.keys().hasOnly(['contributionId', 'memberId', 'linkedUid', 'fileName', 'mimeType', 'storageReference', 'uploadedBy', 'uploadedByName', 'createdAt'])
+        && data.contributionId is string && isValidId(data.contributionId)
+        && data.memberId is string && isValidId(data.memberId)
+        && isValidOptionalId(data, 'linkedUid')
+        && data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 160
+        && data.mimeType is string && data.mimeType.size() >= 3 && data.mimeType.size() <= 100
+        && data.storageReference is string && data.storageReference.size() >= 1 && data.storageReference.size() <= 400000
+        && data.uploadedBy is string && isValidId(data.uploadedBy) && data.uploadedBy == request.auth.uid
+        && data.uploadedByName is string && data.uploadedByName.size() >= 1 && data.uploadedByName.size() <= 120
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPeriodClosure(data, periodKey) {
+      return data.keys().hasAll(['periodKey', 'status', 'expectedEtb', 'collectedEtb', 'outstandingEtb', 'cashReconciledEtb', 'bankReconciledEtb', 'preparedBy', 'updatedBy', 'updatedAt'])
+        && data.keys().hasOnly(['periodKey', 'status', 'expectedEtb', 'collectedEtb', 'outstandingEtb', 'cashReconciledEtb', 'bankReconciledEtb', 'preparedBy', 'reviewedBy', 'approvedBy', 'notes', 'updatedBy', 'updatedAt'])
+        && data.periodKey is string && data.periodKey == periodKey && data.periodKey.matches('^[0-9]{4}-[0-9]{2}$')
+        && data.status in ['open', 'closed']
+        && (data.expectedEtb is int || data.expectedEtb is float) && data.expectedEtb >= 0
+        && (data.collectedEtb is int || data.collectedEtb is float) && data.collectedEtb >= 0
+        && (data.outstandingEtb is int || data.outstandingEtb is float) && data.outstandingEtb >= 0
+        && (data.cashReconciledEtb is int || data.cashReconciledEtb is float) && data.cashReconciledEtb >= 0
+        && (data.bankReconciledEtb is int || data.bankReconciledEtb is float) && data.bankReconciledEtb >= 0
+        && data.preparedBy is string && data.preparedBy.size() >= 1 && data.preparedBy.size() <= 120
+        && isValidOptionalString(data, 'reviewedBy', 120)
+        && isValidOptionalString(data, 'approvedBy', 120)
+        && isValidOptionalString(data, 'notes', 500)
+        && data.updatedBy is string && isValidId(data.updatedBy) && data.updatedBy == request.auth.uid
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCenterStats(data) {
+      return data.keys().hasAll(['totalCollectedEtb', 'expectedMonthlyEtb', 'activeMembersCount', 'totalMembersCount', 'updatedBy', 'updatedAt'])
+        && data.keys().hasOnly(['totalCollectedEtb', 'expectedMonthlyEtb', 'activeMembersCount', 'totalMembersCount', 'updatedBy', 'updatedAt'])
+        && (data.totalCollectedEtb is int || data.totalCollectedEtb is float) && data.totalCollectedEtb >= 0
+        && (data.expectedMonthlyEtb is int || data.expectedMonthlyEtb is float) && data.expectedMonthlyEtb >= 0
+        && (data.activeMembersCount is int || data.activeMembersCount is float) && data.activeMembersCount >= 0
+        && (data.totalMembersCount is int || data.totalMembersCount is float) && data.totalMembersCount >= 0
+        && data.updatedBy is string && isValidId(data.updatedBy) && data.updatedBy == request.auth.uid
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorEmail', 'action', 'targetType', 'targetId', 'details', 'createdAt'])
+        && data.keys().hasOnly(['actorUid', 'actorEmail', 'action', 'targetType', 'targetId', 'details', 'createdAt'])
+        && data.actorUid is string && isValidId(data.actorUid) && data.actorUid == request.auth.uid
+        && data.actorEmail is string && data.actorEmail.size() >= 3 && data.actorEmail.size() <= 200
+        && data.action is string && data.action.size() >= 2 && data.action.size() <= 80
+        && data.targetType in ['user', 'member', 'contribution', 'period', 'evidence', 'workspace', 'system']
+        && data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128
+        && data.details is string && data.details.size() >= 2 && data.details.size() <= 500
+        && data.createdAt is timestamp;
+    }
+
+    function isValidSyncDiagnostic(data, syncId) {
+      return data.keys().hasAll(['integrationId', 'status', 'consecutiveFailures', 'triggeredByUid', 'triggeredByEmail', 'updatedAt'])
+        && data.keys().hasOnly(['integrationId', 'status', 'lastSuccessAt', 'lastAttemptAt', 'firstFailureAt', 'consecutiveFailures', 'lastError', 'lastSpreadsheetId', 'lastSpreadsheetUrl', 'lastSyncedMembersCount', 'lastSyncedContributionsCount', 'lastSyncedPeriod', 'triggeredByUid', 'triggeredByEmail', 'updatedAt'])
+        && data.integrationId is string && data.integrationId == syncId && isValidId(data.integrationId)
+        && data.status in ['never', 'success', 'failed']
+        && (!('lastSuccessAt' in data) || data.lastSuccessAt is timestamp)
+        && (!('lastAttemptAt' in data) || data.lastAttemptAt is timestamp)
+        && (!('firstFailureAt' in data) || data.firstFailureAt is timestamp)
+        && (data.consecutiveFailures is int || data.consecutiveFailures is float) && data.consecutiveFailures >= 0
+        && isValidOptionalString(data, 'lastError', 500)
+        && isValidOptionalString(data, 'lastSpreadsheetId', 128)
+        && isValidOptionalString(data, 'lastSpreadsheetUrl', 400)
+        && (!('lastSyncedMembersCount' in data) || ((data.lastSyncedMembersCount is int || data.lastSyncedMembersCount is float) && data.lastSyncedMembersCount >= 0))
+        && (!('lastSyncedContributionsCount' in data) || ((data.lastSyncedContributionsCount is int || data.lastSyncedContributionsCount is float) && data.lastSyncedContributionsCount >= 0))
+        && isValidOptionalString(data, 'lastSyncedPeriod', 20)
+        && data.triggeredByUid is string && isValidId(data.triggeredByUid) && data.triggeredByUid == request.auth.uid
+        && data.triggeredByEmail is string && data.triggeredByEmail.size() >= 3 && data.triggeredByEmail.size() <= 200
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFinancialGoal(data, yearKey) {
+      return data.keys().hasAll(['year', 'targetEtb', 'updatedBy', 'updatedByName', 'updatedAt'])
+        && data.keys().hasOnly(['year', 'targetEtb', 'notes', 'updatedBy', 'updatedByName', 'updatedAt'])
+        && data.year is string && data.year == yearKey && data.year.matches('^[0-9]{4}$')
+        && (data.targetEtb is int || data.targetEtb is float) && data.targetEtb > 0
+        && isValidOptionalString(data, 'notes', 300)
+        && data.updatedBy is string && isValidId(data.updatedBy) && data.updatedBy == request.auth.uid
+        && data.updatedByName is string && data.updatedByName.size() >= 1 && data.updatedByName.size() <= 120
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMeetingMinute(data) {
+      return data.keys().hasAll(['periodKey', 'title', 'meetingDate', 'summaryNotes', 'recordedBy', 'recordedByName', 'updatedBy', 'updatedByName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['periodKey', 'title', 'meetingDate', 'chairperson', 'attendeesCount', 'attendeesSummary', 'summaryNotes', 'decisions', 'recordedBy', 'recordedByName', 'updatedBy', 'updatedByName', 'createdAt', 'updatedAt'])
+        && data.periodKey is string && data.periodKey.size() >= 7 && data.periodKey.size() <= 20 && data.periodKey.matches('^[0-9]{4}-[0-9]{2}$')
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 160
+        && data.meetingDate is string && data.meetingDate.size() >= 4 && data.meetingDate.size() <= 32
+        && isValidOptionalString(data, 'chairperson', 120)
+        && (!('attendeesCount' in data) || ((data.attendeesCount is int || data.attendeesCount is float) && data.attendeesCount >= 0 && data.attendeesCount <= 10000))
+        && isValidOptionalString(data, 'attendeesSummary', 300)
+        && data.summaryNotes is string && data.summaryNotes.size() >= 5 && data.summaryNotes.size() <= 4000
+        && isValidOptionalString(data, 'decisions', 2000)
+        && data.recordedBy is string && isValidId(data.recordedBy)
+        && data.recordedByName is string && data.recordedByName.size() >= 1 && data.recordedByName.size() <= 120
+        && data.updatedBy is string && isValidId(data.updatedBy) && data.updatedBy == request.auth.uid
+        && data.updatedByName is string && data.updatedByName.size() >= 1 && data.updatedByName.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Collection Match Blocks ---
+
+    // 1. Users & 5-Tier RBAC Roles
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdminOrOwner());
+      allow list: if isAdminOrOwner();
+
+      allow create: if isSignedIn()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidUserAccount(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isBootstrappedOwner() && incoming().role == 'owner' && incoming().status == 'active')
+          || (incoming().role == 'member' && incoming().status == 'active' && !('linkedMemberId' in incoming()))
+        );
+
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && isValidUserAccount(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isOwner()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'status', 'linkedMemberId', 'displayName', 'photoURL', 'updatedAt'])
+            && !(existing().email == 'markazalfurqan36@gmail.com' && (incoming().role != 'owner' || incoming().status != 'active'))
+          )
+          ||
+          (
+            isActiveAccount()
+            && request.auth.uid == userId
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isOwner() && isValidId(userId) && existing().email != 'markazalfurqan36@gmail.com';
+    }
+
+    // 2. Members Registry + Effective-Dated History Subcollections
+    match /members/{memberId} {
+      allow get: if isSignedIn() && isValidId(memberId) && (
+        isCashierOrAbove() || (isActiveAccount() && existing().linkedUid == request.auth.uid)
+      );
+      allow list: if isCashierOrAbove() || (isActiveAccount() && resource.data.linkedUid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isValidId(memberId)
+        && isValidMember(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner();
+
+      allow update: if isSignedIn()
+        && isValidId(memberId)
+        && isValidMember(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['memberCode', 'fullName', 'phone', 'email', 'location', 'birthDate', 'category', 'monthlyCommitment', 'status', 'joinedDate', 'effectiveMonth', 'notes', 'linkedUid', 'updatedAt']);
+
+      allow delete: if isOwner() && isValidId(memberId);
+
+      // Immutable effective-dated commitment history
+      match /commitment_history/{entryId} {
+        allow get: if isSignedIn() && isValidId(memberId) && isValidId(entryId) && (
+          isCashierOrAbove()
+          || (isActiveAccount() && get(/databases/$(database)/documents/members/$(memberId)).data.linkedUid == request.auth.uid)
+        );
+        allow list: if isSignedIn() && isValidId(memberId) && (
+          isCashierOrAbove()
+          || (isActiveAccount() && get(/databases/$(database)/documents/members/$(memberId)).data.linkedUid == request.auth.uid)
+        );
+        allow create: if isSignedIn()
+          && isValidId(memberId)
+          && isValidId(entryId)
+          && isValidCommitmentHistory(incoming(), memberId)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/members/$(memberId))
+          && isAdminOrOwner();
+        allow update, delete: if false;
+      }
+
+      // Immutable effective-dated membership status history
+      match /status_history/{entryId} {
+        allow get: if isSignedIn() && isValidId(memberId) && isValidId(entryId) && (
+          isCashierOrAbove()
+          || (isActiveAccount() && get(/databases/$(database)/documents/members/$(memberId)).data.linkedUid == request.auth.uid)
+        );
+        allow list: if isSignedIn() && isValidId(memberId) && (
+          isCashierOrAbove()
+          || (isActiveAccount() && get(/databases/$(database)/documents/members/$(memberId)).data.linkedUid == request.auth.uid)
+        );
+        allow create: if isSignedIn()
+          && isValidId(memberId)
+          && isValidId(entryId)
+          && isValidStatusHistory(incoming(), memberId)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/members/$(memberId))
+          && isAdminOrOwner();
+        allow update, delete: if false;
+      }
+    }
+
+    // 3. Contributions Ledger (No unrestricted deletion; cancel with reason instead)
+    match /contributions/{contributionId} {
+      allow get: if isSignedIn() && isValidId(contributionId) && (
+        isCashierOrAbove() || (isActiveAccount() && existing().linkedUid == request.auth.uid)
+      );
+      allow list: if isCashierOrAbove() || (isActiveAccount() && resource.data.linkedUid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isValidId(contributionId)
+        && isValidContribution(incoming())
+        && incoming().recordedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/members/$(incoming().memberId))
+        && isCashierOrAbove()
+        // Cashiers create pending or confirmed; only Admin/Owner can record pre-cancelled/rejected
+        && (isAdminOrOwner() || incoming().status in ['pending', 'confirmed']);
+
+      allow update: if isSignedIn()
+        && isValidId(contributionId)
+        && isValidContribution(incoming())
+        && incoming().recordedBy == existing().recordedBy
+        && incoming().recordedByName == existing().recordedByName
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Terminal lock: cancelled/rejected entries cannot be overwritten except by Owner
+          (
+            existing().status in ['pending', 'confirmed']
+            && isCashierOrAbove()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'statusReason', 'statusChangedBy', 'evidenceNote', 'notes', 'updatedAt'])
+          )
+          ||
+          (
+            isOwner()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'statusReason', 'statusChangedBy', 'notes', 'updatedAt'])
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    // 4. Restricted Payment Evidence Attachments
+    match /payment_evidence/{evidenceId} {
+      allow get: if isSignedIn() && isValidId(evidenceId) && (
+        isCashierOrAbove() || (isActiveAccount() && existing().linkedUid == request.auth.uid)
+      );
+      allow list: if isCashierOrAbove() || (isActiveAccount() && resource.data.linkedUid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isValidId(evidenceId)
+        && isValidPaymentEvidence(incoming())
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/contributions/$(incoming().contributionId))
+        && (
+          isCashierOrAbove()
+          || (
+            isActiveAccount()
+            && get(/databases/$(database)/documents/members/$(incoming().memberId)).data.linkedUid == request.auth.uid
+          )
+        );
+
+      allow update, delete: if false;
+    }
+
+    // 5. Monthly Period Closures & Reconciliation Sign-off
+    match /period_closures/{periodKey} {
+      allow get: if isSignedIn() && isValidId(periodKey) && isViewerOrAbove();
+      allow list: if isViewerOrAbove();
+
+      allow create, update: if isSignedIn()
+        && isValidId(periodKey)
+        && isValidPeriodClosure(incoming(), periodKey)
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner();
+
+      allow delete: if false;
+    }
+
+    // 6. Center Summary Stats (Non-PII aggregates for Viewer & Member dashboards)
+    match /center_stats/{statId} {
+      allow get: if isSignedIn() && isValidId(statId) && isActiveAccount();
+      allow list: if false;
+      allow create, update: if isSignedIn()
+        && isValidId(statId)
+        && isValidCenterStats(incoming())
+        && incoming().updatedAt == request.time
+        && isCashierOrAbove();
+      allow delete: if false;
+    }
+
+    // 7. Immutable Governance Audit Logs
+    match /audit_logs/{logId} {
+      allow get: if isSignedIn() && isValidId(logId) && isViewerOrAbove();
+      allow list: if isViewerOrAbove();
+      allow create: if isSignedIn()
+        && isValidId(logId)
+        && isValidAuditLog(incoming())
+        && incoming().createdAt == request.time
+        && isCashierOrAbove();
+      allow update, delete: if false;
+    }
+
+    // 8. Integration Sync Diagnostics (Google Sheets synchronization health)
+    match /sync_diagnostics/{syncId} {
+      allow get: if isSignedIn() && isValidId(syncId) && isViewerOrAbove();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && isValidId(syncId)
+        && isValidSyncDiagnostic(incoming(), syncId)
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner();
+      allow update: if isSignedIn()
+        && isValidId(syncId)
+        && isValidSyncDiagnostic(incoming(), syncId)
+        && incoming().integrationId == existing().integrationId
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lastSuccessAt', 'lastAttemptAt', 'firstFailureAt', 'consecutiveFailures', 'lastError', 'lastSpreadsheetId', 'lastSpreadsheetUrl', 'lastSyncedMembersCount', 'lastSyncedContributionsCount', 'lastSyncedPeriod', 'triggeredByUid', 'triggeredByEmail', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 9. Annual Financial Goals (Admin/Owner-configured annual contribution targets)
+    match /financial_goals/{yearKey} {
+      allow get: if isSignedIn() && isValidId(yearKey) && isActiveAccount();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && isValidId(yearKey)
+        && isValidFinancialGoal(incoming(), yearKey)
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner();
+      allow update: if isSignedIn()
+        && isValidId(yearKey)
+        && isValidFinancialGoal(incoming(), yearKey)
+        && incoming().year == existing().year
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['targetEtb', 'notes', 'updatedBy', 'updatedByName', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 10. Monthly Center Meeting Minutes Archive
+    match /meeting_minutes/{minuteId} {
+      allow get: if isSignedIn() && isValidId(minuteId) && isViewerOrAbove();
+      allow list: if isViewerOrAbove();
+
+      allow create: if isSignedIn()
+        && isValidId(minuteId)
+        && isValidMeetingMinute(incoming())
+        && incoming().recordedBy == request.auth.uid
+        && incoming().updatedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner();
+
+      allow update: if isSignedIn()
+        && isValidId(minuteId)
+        && isValidMeetingMinute(incoming())
+        && incoming().recordedBy == existing().recordedBy
+        && incoming().recordedByName == existing().recordedByName
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time
+        && isAdminOrOwner()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['periodKey', 'title', 'meetingDate', 'chairperson', 'attendeesCount', 'attendeesSummary', 'summaryNotes', 'decisions', 'updatedBy', 'updatedByName', 'updatedAt']);
+
+      allow delete: if isOwner() && isValidId(minuteId);
+    }
+  }
+}

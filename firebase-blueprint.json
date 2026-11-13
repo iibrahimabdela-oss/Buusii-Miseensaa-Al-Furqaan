@@ -1,0 +1,766 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Authenticated platform user profile and 5-tier RBAC role assignment (owner, admin, cashier, viewer, member).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "role": {
+          "type": "string",
+          "enum": ["owner", "admin", "cashier", "viewer", "member"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended"]
+        },
+        "linkedMemberId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "status", "createdAt", "updatedAt"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Registered monthly contributor of Al-Furqaan Qur'an Memorization Center.",
+      "type": "object",
+      "properties": {
+        "memberCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "location": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "birthDate": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "category": {
+          "type": "string",
+          "enum": ["monthly", "sponsor", "lifetime", "donor"]
+        },
+        "monthlyCommitment": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "paused", "ended"]
+        },
+        "joinedDate": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32
+        },
+        "effectiveMonth": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "linkedUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "memberCode",
+        "fullName",
+        "category",
+        "monthlyCommitment",
+        "status",
+        "joinedDate",
+        "effectiveMonth",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CommitmentHistory": {
+      "title": "CommitmentHistory",
+      "description": "Immutable effective-dated history of monthly commitment changes for accurate historical reporting.",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "amountEtb": {
+          "type": "number"
+        },
+        "effectiveFrom": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300
+        },
+        "changedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "changedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["memberId", "amountEtb", "effectiveFrom", "reason", "changedBy", "changedByName", "createdAt"]
+    },
+    "MembershipStatusHistory": {
+      "title": "MembershipStatusHistory",
+      "description": "Immutable effective-dated history of membership status intervals (active, paused, ended).",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "paused", "ended"]
+        },
+        "effectiveFrom": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300
+        },
+        "changedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "changedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["memberId", "status", "effectiveFrom", "reason", "changedBy", "changedByName", "createdAt"]
+    },
+    "Contribution": {
+      "title": "Contribution",
+      "description": "Member buusii payment record with separated contribution month and received date, 4 statuses, and audit cancellation.",
+      "type": "object",
+      "properties": {
+        "receiptNumber": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "memberId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "memberName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "memberCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 32
+        },
+        "linkedUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["ETB"]
+        },
+        "month": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20
+        },
+        "paymentDate": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["cash", "cbe", "telebirr", "coop_bank", "awash_bank", "other"]
+        },
+        "referenceCode": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "cancelled", "rejected"]
+        },
+        "statusReason": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "statusChangedBy": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "evidenceNote": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "recordedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recordedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "receiptNumber",
+        "memberId",
+        "memberName",
+        "memberCode",
+        "amount",
+        "currency",
+        "month",
+        "paymentDate",
+        "paymentMethod",
+        "status",
+        "recordedBy",
+        "recordedByName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PaymentEvidence": {
+      "title": "PaymentEvidence",
+      "description": "Restricted payment proof attachment metadata or small proof document linked to a contribution.",
+      "type": "object",
+      "properties": {
+        "contributionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "memberId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "linkedUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100
+        },
+        "storageReference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400000
+        },
+        "uploadedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uploadedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "contributionId",
+        "memberId",
+        "fileName",
+        "mimeType",
+        "storageReference",
+        "uploadedBy",
+        "uploadedByName",
+        "createdAt"
+      ]
+    },
+    "PeriodClosure": {
+      "title": "PeriodClosure",
+      "description": "Monthly close, reconciliation, and sign-off record for a YYYY-MM period.",
+      "type": "object",
+      "properties": {
+        "periodKey": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20,
+          "pattern": "^[0-9]{4}-[0-9]{2}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "closed"]
+        },
+        "expectedEtb": { "type": "number" },
+        "collectedEtb": { "type": "number" },
+        "outstandingEtb": { "type": "number" },
+        "cashReconciledEtb": { "type": "number" },
+        "bankReconciledEtb": { "type": "number" },
+        "preparedBy": { "type": "string", "maxLength": 120 },
+        "reviewedBy": { "type": "string", "maxLength": 120 },
+        "approvedBy": { "type": "string", "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "periodKey",
+        "status",
+        "expectedEtb",
+        "collectedEtb",
+        "outstandingEtb",
+        "cashReconciledEtb",
+        "bankReconciledEtb",
+        "preparedBy",
+        "updatedBy",
+        "updatedAt"
+      ]
+    },
+    "CenterStats": {
+      "title": "CenterStats",
+      "description": "Non-PII aggregate monthly contribution summary readable by active signed-in users.",
+      "type": "object",
+      "properties": {
+        "totalCollectedEtb": { "type": "number" },
+        "expectedMonthlyEtb": { "type": "number" },
+        "activeMembersCount": { "type": "number" },
+        "totalMembersCount": { "type": "number" },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["totalCollectedEtb", "expectedMonthlyEtb", "activeMembersCount", "totalMembersCount", "updatedBy", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Append-only governance, commitment, status, payment, and reconciliation audit log.",
+      "type": "object",
+      "properties": {
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorEmail": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "action": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "targetType": {
+          "type": "string",
+          "enum": ["user", "member", "contribution", "period", "evidence", "workspace", "system"]
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "details": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["actorUid", "actorEmail", "action", "targetType", "targetId", "details", "createdAt"]
+    },
+    "SyncDiagnostic": {
+      "title": "SyncDiagnostic",
+      "description": "Tracks the status, timestamps, and error diagnostics of Google Sheets member data synchronization.",
+      "type": "object",
+      "properties": {
+        "integrationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["never", "success", "failed"]
+        },
+        "lastSuccessAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastAttemptAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "firstFailureAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "consecutiveFailures": {
+          "type": "number"
+        },
+        "lastError": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "lastSpreadsheetId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "lastSpreadsheetUrl": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "lastSyncedMembersCount": {
+          "type": "number"
+        },
+        "lastSyncedContributionsCount": {
+          "type": "number"
+        },
+        "lastSyncedPeriod": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "triggeredByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "triggeredByEmail": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "integrationId",
+        "status",
+        "consecutiveFailures",
+        "triggeredByUid",
+        "triggeredByEmail",
+        "updatedAt"
+      ]
+    },
+    "FinancialGoal": {
+      "title": "FinancialGoal",
+      "description": "Annual contribution target (ETB) configured by Admins/Owners for the Dashboard Financial Goals progress tracker.",
+      "type": "object",
+      "properties": {
+        "year": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 4,
+          "pattern": "^[0-9]{4}$"
+        },
+        "targetEtb": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["year", "targetEtb", "updatedBy", "updatedByName", "updatedAt"]
+    },
+    "MeetingMinute": {
+      "title": "MeetingMinute",
+      "description": "Monthly center meeting summary notes and key decisions linked to a YYYY-MM period for historical archiving.",
+      "type": "object",
+      "properties": {
+        "periodKey": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20,
+          "pattern": "^[0-9]{4}-[0-9]{2}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "meetingDate": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32
+        },
+        "chairperson": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "attendeesCount": {
+          "type": "number"
+        },
+        "attendeesSummary": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "summaryNotes": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 4000
+        },
+        "decisions": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "recordedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recordedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "periodKey",
+        "title",
+        "meetingDate",
+        "summaryNotes",
+        "recordedBy",
+        "recordedByName",
+        "updatedBy",
+        "updatedByName",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "User profiles and 5-tier RBAC roles (owner, admin, cashier, viewer, member)."
+    },
+    "/members/{memberId}": {
+      "schema": { "$ref": "#/entities/Member" },
+      "description": "Member registry. Expenses removed completely; strictly Buusii Miseensaa."
+    },
+    "/members/{memberId}/commitment_history/{entryId}": {
+      "schema": { "$ref": "#/entities/CommitmentHistory" },
+      "description": "Effective-dated commitment history subcollection preserving past months."
+    },
+    "/members/{memberId}/status_history/{entryId}": {
+      "schema": { "$ref": "#/entities/MembershipStatusHistory" },
+      "description": "Effective-dated membership status history subcollection (active, paused, ended)."
+    },
+    "/contributions/{contributionId}": {
+      "schema": { "$ref": "#/entities/Contribution" },
+      "description": "Member monthly buusii contributions with 4 statuses and audit-preserved cancellation."
+    },
+    "/payment_evidence/{evidenceId}": {
+      "schema": { "$ref": "#/entities/PaymentEvidence" },
+      "description": "Restricted payment evidence receipts/attachments."
+    },
+    "/period_closures/{periodKey}": {
+      "schema": { "$ref": "#/entities/PeriodClosure" },
+      "description": "Monthly reconciliation & closing sign-off records."
+    },
+    "/center_stats/{statId}": {
+      "schema": { "$ref": "#/entities/CenterStats" },
+      "description": "Non-PII aggregate center statistics."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Append-only governance and financial audit trail."
+    },
+    "/sync_diagnostics/{syncId}": {
+      "schema": { "$ref": "#/entities/SyncDiagnostic" },
+      "description": "Google Sheets synchronization status and failure telemetry for Admin diagnostics."
+    },
+    "/financial_goals/{yearKey}": {
+      "schema": { "$ref": "#/entities/FinancialGoal" },
+      "description": "Annual contribution financial targets configured by Admins/Owners."
+    },
+    "/meeting_minutes/{minuteId}": {
+      "schema": { "$ref": "#/entities/MeetingMinute" },
+      "description": "Monthly center meeting summary notes linked to YYYY-MM periods for historical archiving."
+    }
+  }
+}

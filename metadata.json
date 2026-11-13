@@ -1,0 +1,6 @@
+{
+  "name": "Al-Furqaan Membership System",
+  "description": "Sirna Buusii Miseensaa Al-Furqaan — Membership, contributions (buusii), receipts, expenses, role-based governance, and Google Workspace operations for Al-Furqaan Qur'an Memorization Center.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

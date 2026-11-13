@@ -1,11 +1,9 @@
-<div align="center">
+# Al-Furqaan Membership System (Sirna Buusii Miseensaa Al-Furqaan)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Membership, contributions (*buusii*), receipts, operational expenses, 3-tier role-based governance (`owner` / `admin` / `user`), Google Workspace sync (Drive, Sheets, Gmail), and Gemini 3.8 Flash Google Search Grounding for **Al-Furqaan Qur’an Memorization Center** (Chiro – West Hararghe – Oromia – Ethiopia).
 
-  <h1>Built with AI Studio</h2>
-
-  <p>The fastest path from prompt to production with Gemini.</p>
-
-  <a href="https://aistudio.google.com/apps">Start building</a>
-
-</div>
+## Commands
+- `npm run dev` — Start Express + Vite dev server on port 3000
+- `npm run build` — Build production React bundle into `dist/`
+- `npm run start` — Start production server (`node server.ts`)
+- `npm run lint` — TypeScript check (`tsc --noEmit`)
